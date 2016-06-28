@@ -1,7 +1,7 @@
 ---
 services: active-directory
 platforms: dotnet
-author: dstrockis
+author: gsacavdm
 ---
 
 # Integrating Azure AD (v2.0 endpoint) into an ASP.NET Core web app
@@ -66,7 +66,46 @@ This sample shows how to use the OpenID Connect ASP.Net Core middleware to sign-
 - Processing OpenID Connect sign-in responses by validating the signature and issuer in an incoming JWT, extracting the user's claims, and putting them on ClaimsPrincipal.Current.
 - Integrating with the session cookie ASP.Net 5 middleware to establish a session for the user.
 
-> [AZURE.IMPORTANT] Given that this application is multi-tenant, we will be ignoring the issuer name from the Azure AD metadata and implementing our own issuer validation.
+This sample has been coded to support both Microsoft accounts and Azure Active Directory accounts. The code that enables this can be found in Startup.cs where you first need to disable issuer validation,
+```C#
+app.UseOpenIdConnectAuthentication(new OpenIdConnectOptions
+{
+  // (...)
+  TokenValidationParameters = new TokenValidationParameters
+  {
+    ValidateIssuer = false
+  }
+});
+```
+And then leverage the OnTokenValidated notification to implement your own issuer validation logic depending on which tenants you want to support (any tenant, Microsoft Account + specific list of Azure AD, single Azure AD, just Microsoft Account, etc)
+```C#
+app.UseOpenIdConnectAuthentication(new OpenIdConnectOptions
+{
+  (...)
+  Events = new OpenIdConnectEvents
+  {
+    OnTokenValidated = TokenValidated
+  }
+});
+```
+
+```C#
+private Task TokenValidated(TokenValidatedContext context)
+{
+  // Example of how to validate for Microsoft Account + specific Azure AD tenant       
+  string tenantID = context.Ticket.Principal.FindFirst("http://schemas.microsoft.com/identity/claims/tenantid").Value;
+
+  IEnumerable<string> approvedTenantIds = new List<string>
+  {
+    "<Your tenantID>",
+    "9188040d-6c67-4c5b-b112-36a304b66dad" // MSA Tenant
+  };
+  if (!approvedTenantIds.Contains(tenantID))
+    throw new SecurityTokenValidationException();
+
+  return Task.FromResult(0);
+}
+```
 
 You can trigger the middleware to send an OpenID Connect sign-in request by decorating a class or method with the `[Authorize]` attribute, or by issuing a challenge,
 ```C#
