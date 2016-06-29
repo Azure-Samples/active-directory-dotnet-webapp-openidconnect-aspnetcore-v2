@@ -11,6 +11,8 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.IdentityModel.Protocols.OpenIdConnect;
 using Microsoft.IdentityModel.Tokens;
+using System.Globalization;
+using Microsoft.AspNetCore.Authentication;
 
 namespace WebApp_OpenIDConnect_DotNet
 {
@@ -57,12 +59,12 @@ namespace WebApp_OpenIDConnect_DotNet
             app.UseOpenIdConnectAuthentication(new OpenIdConnectOptions
             {
                 ClientId = Configuration["AzureAD:ClientId"],
-                Authority = Configuration["AzureAd:AadInstance"],
+                Authority = string.Format(CultureInfo.InvariantCulture, Configuration["AzureAd:AadInstance"], "common", "/v2.0"),
                 ResponseType = OpenIdConnectResponseTypes.IdToken,
                 PostLogoutRedirectUri = Configuration["AzureAd:PostLogoutRedirectUri"],
                 Events = new OpenIdConnectEvents
                 {
-                    OnAuthenticationFailed = OnAuthenticationFailed,
+                    OnRemoteFailure = RemoteFailure,
                     OnTokenValidated = TokenValidated
                 },
                 TokenValidationParameters = new TokenValidationParameters
@@ -108,10 +110,10 @@ namespace WebApp_OpenIDConnect_DotNet
         }
 
         // Handle sign-in errors differently than generic errors.
-        private Task OnAuthenticationFailed(AuthenticationFailedContext context)
+        private Task RemoteFailure(FailureContext context)
         {
             context.HandleResponse();
-            context.Response.Redirect("/Home/Error?message=" + context.Exception.Message);
+            context.Response.Redirect("/Home/Error?message=" + context.Failure.Message);
             return Task.FromResult(0);
         }
     }
