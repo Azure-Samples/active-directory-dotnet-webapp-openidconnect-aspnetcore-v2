@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using Microsoft.AspNetCore.Builder;
@@ -12,7 +13,6 @@ using Microsoft.Extensions.Logging;
 using Microsoft.IdentityModel.Protocols.OpenIdConnect;
 using Microsoft.IdentityModel.Tokens;
 using System.Globalization;
-using Microsoft.AspNetCore.Authentication;
 
 namespace WebApp_OpenIDConnect_DotNet
 {
@@ -60,7 +60,7 @@ namespace WebApp_OpenIDConnect_DotNet
             {
                 ClientId = Configuration["AzureAD:ClientId"],
                 Authority = string.Format(CultureInfo.InvariantCulture, Configuration["AzureAd:AadInstance"], "common", "/v2.0"),
-                ResponseType = OpenIdConnectResponseTypes.IdToken,
+                ResponseType = OpenIdConnectResponseType.IdToken,
                 PostLogoutRedirectUri = Configuration["AzureAd:PostLogoutRedirectUri"],
                 Events = new OpenIdConnectEvents
                 {
