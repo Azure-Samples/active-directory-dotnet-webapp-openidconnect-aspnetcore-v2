@@ -1,7 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
+﻿using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
@@ -37,7 +34,31 @@ namespace WebApp_OpenIDConnect_DotNet
             services.AddMvc();
 
             // Add Authentication services.
-            services.AddAuthentication(sharedOptions => sharedOptions.SignInScheme = CookieAuthenticationDefaults.AuthenticationScheme);
+            services.AddAuthentication(sharedOptions => sharedOptions.DefaultSignInScheme = CookieAuthenticationDefaults.AuthenticationScheme)
+                // Configure the OWIN pipeline to use cookie auth.
+                .AddCookie(option=> new CookieAuthenticationOptions())
+                // Configure the OWIN pipeline to use OpenID Connect auth.
+                .AddOpenIdConnect(option=> new OpenIdConnectOptions
+                {
+                    ClientId = Configuration["AzureAD:ClientId"],
+                    Authority = string.Format(CultureInfo.InvariantCulture, Configuration["AzureAd:AadInstance"], "common", "/v2.0"),
+                    ResponseType = OpenIdConnectResponseType.IdToken,
+                    SignedOutRedirectUri = Configuration["AzureAd:PostLogoutRedirectUri"],
+                    Events = new OpenIdConnectEvents
+                    {
+                        OnRemoteFailure = RemoteFailure,
+                        OnTokenValidated = TokenValidated
+                    },
+                    TokenValidationParameters = new TokenValidationParameters
+                    {
+                        // Instead of using the default validation (validating against
+                        // a single issuer value, as we do in line of business apps), 
+                        // we inject our own multitenant validation logic
+                        ValidateIssuer = false,
+
+                        NameClaimType = "name"
+                    }
+                });
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
@@ -52,32 +73,7 @@ namespace WebApp_OpenIDConnect_DotNet
             // Add static files to the request pipeline.
             app.UseStaticFiles();
 
-            // Configure the OWIN pipeline to use cookie auth.
-            app.UseCookieAuthentication(new CookieAuthenticationOptions());
-
-            // Configure the OWIN pipeline to use OpenID Connect auth.
-            app.UseOpenIdConnectAuthentication(new OpenIdConnectOptions
-            {
-                ClientId = Configuration["AzureAD:ClientId"],
-                Authority = string.Format(CultureInfo.InvariantCulture, Configuration["AzureAd:AadInstance"], "common", "/v2.0"),
-                ResponseType = OpenIdConnectResponseType.IdToken,
-                PostLogoutRedirectUri = Configuration["AzureAd:PostLogoutRedirectUri"],
-                Events = new OpenIdConnectEvents
-                {
-                    OnRemoteFailure = RemoteFailure,
-                    OnTokenValidated = TokenValidated
-                },
-                TokenValidationParameters = new TokenValidationParameters
-                {
-                    // Instead of using the default validation (validating against
-                    // a single issuer value, as we do in line of business apps), 
-                    // we inject our own multitenant validation logic
-                    ValidateIssuer = false,
-
-                    NameClaimType = "name"
-                }
-            });
-
+          
             // Configure MVC routes
             app.UseMvc(routes =>
             {
@@ -112,7 +108,7 @@ namespace WebApp_OpenIDConnect_DotNet
         }
 
         // Handle sign-in errors differently than generic errors.
-        private Task RemoteFailure(FailureContext context)
+        private Task RemoteFailure(RemoteFailureContext context)
         {
             context.HandleResponse();
             context.Response.Redirect("/Home/Error?message=" + context.Failure.Message);
